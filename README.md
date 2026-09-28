@@ -8,7 +8,7 @@
 ## รันในเครื่อง
 เปิด `index.html` ในเบราว์เซอร์ได้เลย หรือใช้ `python3 -m http.server 8000` แล้วเข้า http://localhost:8000
 
-## Deploy
+## Deploy -> https://krittiteesrisai.github.io/miniproject-OS/
 
 **GitHub Pages**
 1. สร้าง repo แล้ว push ไฟล์ `index.html` กับ `README.md`
