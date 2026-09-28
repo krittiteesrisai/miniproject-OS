@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Disk Scheduling Simulator: จำลองและเปรียบเทียบ FCFS, SSTF, SCAN, C-SCAN, LOOK, C-LOOK พร้อมกราฟเส้นทางหัวอ่านและแอนิเมชัน">
+<meta name="theme-color" content="#0d7a6b">
+<meta property="og:title" content="Disk Scheduling Simulator">
+<meta property="og:description" content="จำลองอัลกอริทึม I/O Scheduling ของดิสก์แบบโต้ตอบได้">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%92%BD%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<title>Disk Scheduling Simulator</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f3f5f4;--panel:#fff;--ink:#1c2422;--mute:#5d6b67;--line:#d5dcd9;--acc:#0d7a6b;--hot:#c2410c;--head:#1d4ed8;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121816;--panel:#1a2320;--ink:#e6efec;--mute:#93a49f;--line:#2f3d39;--acc:#3ecfb8;--hot:#fb923c;--head:#7aa2ff}}
+:root[data-theme="dark"]{--bg:#121816;--panel:#1a2320;--ink:#e6efec;--mute:#93a49f;--line:#2f3d39;--acc:#3ecfb8;--hot:#fb923c;--head:#7aa2ff}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"IBM Plex Sans Thai",system-ui,sans-serif;line-height:1.6}
+main{max-width:980px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:1.5rem;margin:0 0 4px}
+p.sub{margin:0 0 16px;color:var(--mute)}
+section{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:14px}
+h2{font-size:1.05rem;margin:0 0 10px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+label{display:block;font-size:.85rem;color:var(--mute)}
+input,select{width:100%;padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font:inherit}
+.wide{grid-column:1/-1}
+.row{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+button{padding:8px 14px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit;cursor:pointer}
+button.primary{background:var(--acc);color:#fff;border-color:var(--acc)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--head);outline-offset:2px}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.9rem}
+th,td{padding:6px 10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+tr.best td{color:var(--acc);font-weight:600}
+tr.sel{background:color-mix(in srgb,var(--acc) 12%,transparent)}
+.stat{display:flex;gap:24px;flex-wrap:wrap;margin:8px 0}
+.stat b{font-size:1.4rem;display:block;color:var(--acc)}
+.order{font-size:.9rem;word-break:break-word}
+svg text{fill:var(--mute);font-size:11px}
+</style>
+</head>
+<body>
+<main>
+<h1>Disk Scheduling Simulator</h1>
+<p class="sub">จำลองการจัดตารางคำขอเข้าถึงดิสก์ (I/O Scheduling) เปรียบเทียบ FCFS, SSTF, SCAN, C-SCAN, LOOK และ C-LOOK</p>
+
+<section>
+<h2>ข้อมูลนำเข้า</h2>
+<div class="grid">
+<div class="wide"><label for="q">คิวคำขอ (หมายเลข cylinder คั่นด้วยเว้นวรรคหรือ ,)</label><input id="q" value="98 183 37 122 14 124 65 67"></div>
+<div><label for="h">ตำแหน่งหัวอ่านเริ่มต้น</label><input id="h" type="number" value="53"></div>
+<div><label for="m">จำนวน cylinder (0 ถึง N-1)</label><input id="m" type="number" value="200"></div>
+<div><label for="d">ทิศทางเริ่มต้น (SCAN/LOOK)</label><select id="d"><option value="up">ไปทางค่ามาก</option><option value="down">ไปทางค่าน้อย</option></select></div>
+<div><label for="a">อัลกอริทึมที่แสดงกราฟ</label><select id="a"></select></div>
+</div>
+<label style="margin-top:10px"><input type="checkbox" id="j" checked style="width:auto"> นับระยะกระโดดกลับของ C-SCAN / C-LOOK รวมใน head movement</label>
+<div class="row">
+<button class="primary" id="run">คำนวณ</button>
+<button id="rnd">สุ่มคำขอ</button>
+<button id="play">เล่นแอนิเมชัน</button>
+<button id="step">ก้าวถัดไป</button>
+<button id="reset">รีเซ็ต</button>
+</div>
+<p id="err" style="color:var(--hot);margin:8px 0 0" role="alert"></p>
+</section>
+
+<section>
+<h2>เส้นทางหัวอ่าน: <span id="an"></span></h2>
+<div class="stat"><div><b id="tot">0</b>Total head movement</div><div><b id="avg">0</b>Average seek / request</div><div><b id="cnt">0</b>ก้าวที่แสดง</div></div>
+<div class="order" id="ord"></div>
+<div class="scroll"><svg id="svg" role="img" aria-label="กราฟเส้นทางหัวอ่านดิสก์" style="width:100%;min-width:560px"></svg></div>
+</section>
+
+<section>
+<h2>เปรียบเทียบทุกอัลกอริทึม</h2>
+<div class="scroll"><table id="cmp"></table></div>
+<p class="sub" style="margin:10px 0 0">แถวสีเขียวคือค่า head movement ต่ำที่สุด คลิกแถวเพื่อดูกราฟของอัลกอริทึมนั้น</p>
+</section>
+</main>
+<noscript>ต้องเปิด JavaScript เพื่อใช้งานตัวจำลอง</noscript>
+<script>
+const ALGS={FCFS:"FCFS (First-Come First-Served)",SSTF:"SSTF (Shortest Seek Time First)",SCAN:"SCAN (Elevator)","C-SCAN":"C-SCAN",LOOK:"LOOK","C-LOOK":"C-LOOK"};
+const $=id=>document.getElementById(id);
+let cur={},shown=0,timer=null;
+for(const k in ALGS){const o=document.createElement("option");o.value=k;o.textContent=ALGS[k];$("a").appendChild(o)}
+
+function schedule(alg,reqs,head,N,dir){
+  const max=N-1,p=[head],r=[...reqs];
+  const left=r.filter(x=>x<head).sort((a,b)=>b-a);   // descending
+  const right=r.filter(x=>x>=head).sort((a,b)=>a-b); // ascending
+  const up=dir==="up";
+  const last=()=>p[p.length-1];
+  if(alg==="FCFS")p.push(...r);
+  else if(alg==="SSTF"){const pool=[...r];let c=head;while(pool.length){let bi=0;pool.forEach((x,i)=>{if(Math.abs(x-c)<Math.abs(pool[bi]-c))bi=i});c=pool.splice(bi,1)[0];p.push(c)}}
+  else if(alg==="SCAN"){
+    if(up){p.push(...right);if(left.length){if(last()!==max)p.push(max);p.push(...left)}}
+    else{p.push(...left);if(right.length){if(last()!==0)p.push(0);p.push(...right)}}}
+  else if(alg==="C-SCAN"){
+    if(up){p.push(...right);if(left.length){if(last()!==max)p.push(max);p.push(0);p.push(...[...left].reverse())}}
+    else{p.push(...left);if(right.length){if(last()!==0)p.push(0);p.push(max);p.push(...[...right].reverse())}}}
+  else if(alg==="LOOK"){
+    if(up)p.push(...right,...left);else p.push(...left,...right)}
+  else if(alg==="C-LOOK"){
+    if(up)p.push(...right,...[...left].reverse());else p.push(...left,...[...right].reverse())}
+  return p;
+}
+
+function parse(){
+  const reqs=$("q").value.split(/[\s,]+/).filter(Boolean).map(Number);
+  const head=+$("h").value,N=+$("m").value;
+  if(!reqs.length||reqs.some(x=>!Number.isInteger(x)))return "กรุณากรอกคำขอเป็นจำนวนเต็ม";
+  if(!(N>1))return "จำนวน cylinder ต้องมากกว่า 1";
+  if(reqs.some(x=>x<0||x>=N)||head<0||head>=N)return "ค่าทุกตัวต้องอยู่ในช่วง 0 ถึง "+(N-1);
+  return {reqs,head,N};
+}
+function calc(){
+  const v=parse();$("err").textContent=typeof v==="string"?v:"";
+  if(typeof v==="string")return;
+  cur={v,res:{}};
+  for(const k in ALGS){
+    const path=schedule(k,v.reqs,v.head,v.N,$("d").value);
+    cur.res[k]={path,tot:total(k,path)};
+  }
+  shown=cur.res[$("a").value].path.length-1;
+  render();
+}
+// total movement: for circular algorithms the single largest reverse jump can be excluded
+function total(alg,p){
+  let t=0,skip=0;
+  if(alg==="C-SCAN"||alg==="C-LOOK"){
+    let big=0,bi=-1;
+    for(let i=1;i<p.length;i++){const d=p[i]-p[i-1];if(Math.sign(d)!==Math.sign(dirOf(p))&&Math.abs(d)>big){big=Math.abs(d);bi=i}}
+    if(bi>0&&!$("j").checked)skip=big;
+  }
+  for(let i=1;i<p.length;i++)t+=Math.abs(p[i]-p[i-1]);
+  return t-skip;
+}
+function dirOf(p){for(let i=1;i<p.length;i++)if(p[i]!==p[i-1])return p[i]-p[i-1];return 1}
+
+function render(){
+  const a=$("a").value,{path}=cur.res[a],{N,reqs}=cur.v;
+  $("an").textContent=ALGS[a];
+  const n=Math.min(shown,path.length-1);
+  let t=0;for(let i=1;i<=n;i++)t+=Math.abs(path[i]-path[i-1]);
+  const full=cur.res[a].tot;
+  $("tot").textContent=n===path.length-1?full:t;
+  $("avg").textContent=(full/reqs.length).toFixed(2);
+  $("cnt").textContent=n+" / "+(path.length-1);
+  $("ord").textContent="ลำดับ: "+path.slice(0,n+1).join(" → ");
+  const W=760,x=c=>40+c/(N-1)*(W-80),y=i=>50+i*26,H=y(path.length-1)+30;
+  let s=`<svg viewBox="0 0 ${W} ${H}">`;
+  const ticks=6;
+  for(let i=0;i<=ticks;i++){const c=Math.round(i*(N-1)/ticks);s+=`<line x1="${x(c)}" x2="${x(c)}" y1="30" y2="${H-10}" stroke="var(--line)"/><text x="${x(c)}" y="20" text-anchor="middle">${c}</text>`}
+  let pts=path.slice(0,n+1).map((c,i)=>x(c)+","+y(i)).join(" ");
+  s+=`<polyline points="${pts}" fill="none" stroke="var(--acc)" stroke-width="2"/>`;
+  path.slice(0,n+1).forEach((c,i)=>{
+    const isReq=i>0&&reqs.includes(c),col=i===0?"var(--head)":isReq?"var(--hot)":"var(--mute)";
+    s+=`<circle cx="${x(c)}" cy="${y(i)}" r="${i===n?6:4}" fill="${col}"/><text x="${x(c)+8}" y="${y(i)+4}">${c}</text>`});
+  s+=`</svg>`;
+  $("svg").outerHTML=s.replace("<svg ",'<svg id="svg" role="img" aria-label="กราฟเส้นทางหัวอ่านดิสก์" style="width:100%;min-width:560px" ');
+  const best=Math.min(...Object.values(cur.res).map(r=>r.tot));
+  let h="<tr><th>อัลกอริทึม</th><th>Head movement</th><th>เฉลี่ยต่อคำขอ</th></tr>";
+  for(const k in ALGS){const r=cur.res[k];h+=`<tr data-k="${k}" class="${r.tot===best?"best":""} ${k===a?"sel":""}" style="cursor:pointer"><td>${ALGS[k]}</td><td>${r.tot}</td><td>${(r.tot/reqs.length).toFixed(2)}</td></tr>`}
+  $("cmp").innerHTML=h;
+  $("cmp").querySelectorAll("tr[data-k]").forEach(tr=>tr.onclick=()=>{$("a").value=tr.dataset.k;stop();shown=cur.res[tr.dataset.k].path.length-1;render()});
+}
+function stop(){clearInterval(timer);timer=null;$("play").textContent="เล่นแอนิเมชัน"}
+$("run").onclick=()=>{stop();calc()};
+["a","d","j"].forEach(id=>$(id).onchange=()=>{stop();calc()});
+$("rnd").onclick=()=>{const N=+$("m").value||200;$("q").value=Array.from({length:8},()=>Math.floor(Math.random()*N)).join(" ");stop();calc()};
+$("reset").onclick=()=>{stop();shown=0;render()};
+$("step").onclick=()=>{stop();const L=cur.res[$("a").value].path.length-1;shown=shown>=L?0:shown+1;render()};
+$("play").onclick=()=>{
+  if(timer){stop();return}
+  const L=cur.res[$("a").value].path.length-1;
+  if(shown>=L)shown=0;
+  $("play").textContent="หยุด";
+  timer=setInterval(()=>{if(shown>=L){stop();return}shown++;render()},600);
+  render();
+};
+calc();
+</script>
+</body>
+</html>
