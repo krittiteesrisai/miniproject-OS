@@ -5,7 +5,7 @@
 
 🔗 เว็บออนไลน์: https://krittiteesrisai.github.io/miniproject-OS/
 
----
+-———-
 
 ## โปรแกรมหลักภาษา C (`disksim/`)
 
